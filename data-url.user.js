@@ -3,7 +3,7 @@
 // @namespace    https://github.com/AlorelUserscripts/data-url-generator
 // @homepage     https://github.com/AlorelUserscripts/data-url-generator
 // @supportURL   https://github.com/AlorelUserscripts/data-url-generator/issues
-// @version      0.1
+// @version      0.1.1
 // @description  Generates data URLs
 // @author       Alorel <a.molcanovas@gmail.com>
 // @include      *
