@@ -11,6 +11,8 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_notification
 // @grant        GM_openInTab
+// @grant        GM_xmlhttpRequest
+// @connect *
 // @noframes
 // @require      https://cdn.rawgit.com/coolaj86/TextEncoderLite/v1.0.0/index.js
 // @require      https://cdn.rawgit.com/beatgammit/base64-js/v1.1.2/base64js.min.js
@@ -49,34 +51,83 @@
                     }
                 });
             },
-            menuCallback;
+            encoder = new TextEncoderLite('utf-8'),
+            contentTypeRegex = /content\-type:\s+([^\/]+\/[a-z0-9]+)/ig,
+            failedEncodeRegex = /^data:;/g,
+            bgImgRegex = /url\(['"]?([^'"\)]+)['"]?\)/g,
+            menuCallback,
+            pseudos = [null, "before", "after"],
+            BG_IMG_NONE = "none";
 
         if (document.contentType === "text/html") {
-            var encoder = new TextEncoderLite('utf-8');
             menuCallback = function () {
                 saveDataURL("data:text/html;base64," + base64js.fromByteArray(encoder.encode(document.firstElementChild.outerHTML)));
             };
         } else {
-            var blobToDataURL = function (blob, callback) {
+            var blobToDataURL = function (blob, callback, fallbackContentType) {
+                if ("undefined" === typeof fallbackContentType) {
+                    fallbackContentType = false;
+                }
                 var a = new FileReader();
                 a.onload = function (e) {
-                    callback(e.target.result);
+                    var res = e.target.result;
+                    if (fallbackContentType && res.match(failedEncodeRegex)) {
+                        res = res.replace(failedEncodeRegex, "data:" + fallbackContentType + ";");
+                    }
+                    callback(res);
                 };
                 a.readAsDataURL(blob);
             }, readyStateListener = function () {
-                if (this.readyState === 4) {
-                    blobToDataURL(this.response, saveDataURL);
+                var fallbackContentType = null,
+                    headers = this.responseHeaders.split("\n"),
+                    i = 0;
+                for (; i < headers.length; i++) {
+                    if (headers[i].match(contentTypeRegex)) {
+                        fallbackContentType = headers[i].replace(contentTypeRegex, "$1");
+                        break;
+                    }
                 }
+                blobToDataURL(this.response, saveDataURL, fallbackContentType);
             };
 
             menuCallback = function () {
-                var xhr = new XMLHttpRequest();
-                xhr.responseType = "blob";
-                xhr.addEventListener("readystatechange", readyStateListener);
-                xhr.open("GET", document.URL);
-                xhr.send();
+                GM_xmlhttpRequest({
+                    responseType: "blob",
+                    method: "GET",
+                    url: document.URL,
+                    onload: readyStateListener
+                });
             };
         }
+
         GM_registerMenuCommand("Get data URL!", menuCallback, "d");
+        GM_registerMenuCommand("Search for images", function () {
+            var ret = [],
+                pageElements = document.querySelectorAll("*"),
+                i = 0,
+                j, k,
+                bgImg;
+
+            for (; i < pageElements.length; i++) {
+                if (pageElements[i] instanceof HTMLImageElement) {
+                    ret.push(pageElements[i].src);
+                } else {
+                    for (j = 0; j < pseudos.length; j++) {
+                        if (
+                            (bgImg = getComputedStyle(pageElements[i], pseudos[j]).backgroundImage) !== BG_IMG_NONE &&
+                            (bgImg = bgImg.match(bgImgRegex))
+                        ) {
+                            for (k = 0; k < bgImg.length; k++) {
+                                ret.push(bgImg[k].replace(bgImgRegex, "$1"));
+                            }
+                        }
+                    }
+                }
+            }
+
+            //Begin generating our DOM
+            var html = document.createElement("html"),
+                head = document.createElement("head")
+        }, "s");
     }
 })(GM_notification);
