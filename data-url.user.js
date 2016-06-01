@@ -12,13 +12,16 @@
 // @grant        GM_notification
 // @grant        GM_openInTab
 // @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
 // @connect *
 // @noframes
 // @require      https://cdn.rawgit.com/coolaj86/TextEncoderLite/v1.0.0/index.js
 // @require      https://cdn.rawgit.com/beatgammit/base64-js/v1.1.2/base64js.min.js
 // @downloadURL  https://raw.githubusercontent.com/AlorelUserscripts/data-url-generator/master/data-url.user.js
 // @updateURL    https://raw.githubusercontent.com/AlorelUserscripts/data-url-generator/master/data-url.meta.js
-// @icon         https://cdn.rawgit.com/AlorelUserscripts/data-url-generator/0.1/ico.png
+
+// @icon         https://cdn.rawgit.com/AlorelUserscripts/data-url-generator/develop/assets/ico.png
 // @license      LGPL-2.1
 // ==/UserScript==
 
@@ -110,7 +113,10 @@
 
             for (; i < pageElements.length; i++) {
                 if (pageElements[i] instanceof HTMLImageElement) {
-                    ret.push(pageElements[i].src);
+                    ret.push({
+                        url: pageElements[i].src,
+                        element: pageElements[i]
+                    });
                 } else {
                     for (j = 0; j < pseudos.length; j++) {
                         if (
@@ -118,7 +124,10 @@
                             (bgImg = bgImg.match(bgImgRegex))
                         ) {
                             for (k = 0; k < bgImg.length; k++) {
-                                ret.push(bgImg[k].replace(bgImgRegex, "$1"));
+                                ret.push({
+                                    url: bgImg[k].replace(bgImgRegex, "$1"),
+                                    element: pageElements[i]
+                                });
                             }
                         }
                     }
@@ -126,8 +135,51 @@
             }
 
             //Begin generating our DOM
-            var html = document.createElement("html"),
-                head = document.createElement("head")
+            var body = document.createElement("body"),
+                table = document.createElement("table"),
+                thead = document.createElement("thead"),
+                tfoot = document.createElement("tfoot"),
+                tbody = document.createElement("tbody"),
+                tr, preview, selector;
+
+            table.style.width = "100%";
+            table.style.borderCollapse = "collapse";
+            thead.innerHTML = '<tr>\
+                <th style="border:1px solid black">Preview</th>\
+                <th style="border:1px solid black">Rough selector</th>\
+                </tr>';
+            tfoot.innerHTML = thead.innerHTML;
+
+            ret.forEach(function (r) {
+                tr = document.createElement("tr");
+                preview = document.createElement("td");
+                selector = document.createElement("td");
+
+                selector.style.whiteSpace = "nowrap";
+                tr.style.border = preview.style.border = selector.style.border = "1px solid black";
+
+                preview.innerHTML = '<img src="' + r.url + '" style="max-width:100%;height:auto"/>';
+                selector.innerText = 'To be implemented';
+
+                tr.appendChild(preview);
+                tr.appendChild(selector);
+                tbody.appendChild(tr);
+            });
+
+            table.appendChild(thead);
+            table.appendChild(tbody);
+            table.appendChild(tfoot);
+            body.appendChild(table);
+
+            var a = document.createElement("a"),
+                event = document.createEvent('HTMLEvents');
+            event.initEvent('click', true, false);
+            a.href = "data:text/html;base64," + base64js.fromByteArray(encoder.encode(body.outerHTML));
+            a.target = "_blank";
+            a.style.display = "none";
+            document.body.appendChild(a);
+            a.dispatchEvent(event);
+            a.parentNode.removeChild(a);
         }, "s");
     }
 })(GM_notification);
